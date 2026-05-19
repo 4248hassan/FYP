@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# env files (IMPORTANT)
+.env
+.env.local
+.env.development
+.env.production
+
+# logs
+logs
+*.log
+
+# build folders
+build/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# misc
+coverage/

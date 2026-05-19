@@ -1,27 +1,131 @@
-const User = require('../models/User');
+                                                                                                                                                                                                                                                                                                                                            const User = require('../models/User');
 const Booking = require('../models/Booking');
+const Complaint = require('../models/Complaint');
 const EscrowPayment = require('../models/EscrowPayment');
 
-exports.listUsers = async (req, res, next) => {
+const debug = (message, data) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[adminController]', message, data || '')
+  }
+}
+
+exports.getAdminStats = async (req, res, next) => {
+  debug('Fetching admin stats for user', { userId: req.user?.id, role: req.user?.role })
   try {
-    const users = await User.find({ role: { $in: ['customer', 'vendor'] } }).select('-password');
-    res.json({ users });
+    const [
+      totalCustomers,
+      totalVendors,
+      totalComplaints,
+      openComplaints,
+      resolvedComplaints,
+      totalBookings,
+      pendingBookings,
+      completedBookings,
+      verifiedVendors,
+      pendingVendors,
+    ] = await Promise.all([
+      User.countDocuments({ role: 'customer' }),
+      User.countDocuments({ role: 'vendor' }),
+      Complaint.countDocuments(),
+      Complaint.countDocuments({ status: 'open' }),
+      Complaint.countDocuments({ status: 'resolved' }),
+      Booking.countDocuments(),
+      Booking.countDocuments({ status: 'pending' }),
+      Booking.countDocuments({ status: 'completed' }),
+      User.countDocuments({ role: 'vendor', isVerified: true }),
+      User.countDocuments({ role: 'vendor', isVerified: false }),
+    ]);
+
+    debug('Admin stats result', {
+      totalCustomers,
+      totalVendors,
+      totalComplaints,
+      openComplaints,
+      resolvedComplaints,
+      totalBookings,
+      pendingBookings,
+      completedBookings,
+      verifiedVendors,
+      pendingVendors,
+    });
+
+    res.json({
+      totalCustomers,
+      totalVendors,
+      totalComplaints,
+      openComplaints,
+      resolvedComplaints,
+      totalBookings,
+      pendingBookings,
+      completedBookings,
+      verifiedVendors,
+      pendingVendors,
+    });
   } catch (err) {
     next(err);
   }
 };
 
-exports.updateVendorStatus = async (req, res, next) => {
+exports.listUsers = async (req, res, next) => {
+  debug('Fetching all users for admin', { userId: req.user?.id })
   try {
-    const { id } = req.params;
-    const { action } = req.body; // 'approve' or 'block'
+    const [customers, vendors] = await Promise.all([
+      User.find({ role: 'customer' }).select('-password'),
+      User.find({ role: 'vendor' }).select('-password'),
+    ]);
+    debug('Admin users loaded', { customersCount: customers.length, vendorsCount: vendors.length })
+    res.json({ customers, vendors });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.listVendors = async (req, res, next) => {
+  debug('Fetching vendor list for admin', { userId: req.user?.id })
+  try {
+    const vendors = await User.find({ role: 'vendor' }).select('-password').sort({ createdAt: -1 });
+    res.json({ vendors });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateUserStatus = async (req, res, next) => {
+  debug('Updating user status', { userId: req.user?.id, params: req.params })
+  try {
+    const { id, action } = req.params;
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.role !== 'vendor') return res.status(400).json({ message: 'Not a vendor' });
-    // For simplicity we'll store a boolean on user: isBlocked
-    user.isBlocked = action === 'block';
+
+    switch (action) {
+      case 'verify':
+        if (user.role !== 'vendor') return res.status(400).json({ message: 'Only vendors can be verified' });
+        user.isVerified = true;
+        break;
+      case 'block':
+        user.isBlocked = true;
+        break;
+      case 'unblock':
+        user.isBlocked = false;
+        break;
+      default:
+        return res.status(400).json({ message: 'Invalid action' });
+    }
+
     await user.save();
-    res.json({ user: { id: user._id, name: user.name, email: user.email, role: user.role, isBlocked: user.isBlocked } });
+    const responseUser = {
+      _id: user._id,
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isBlocked: user.isBlocked,
+      isVerified: user.isVerified,
+      createdAt: user.createdAt,
+    };
+
+    debug('User status updated', responseUser)
+    res.json({ user: responseUser });
   } catch (err) {
     next(err);
   }
@@ -29,8 +133,68 @@ exports.updateVendorStatus = async (req, res, next) => {
 
 exports.listBookings = async (req, res, next) => {
   try {
-    const bookings = await Booking.find().populate('serviceId customerId vendorId');
+    const bookings = await Booking.find()
+      .populate('serviceId', 'name basePrice')
+      .populate('customerId', 'name email')
+      .populate('vendorId', 'name email')
+      .sort({ createdAt: -1 });
     res.json({ bookings });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.listComplaints = async (req, res, next) => {
+  debug('Fetching complaints for admin', { userId: req.user?.id, query: req.query })
+  try {
+    const { status, search } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+    if (search) filter.title = { $regex: search, $options: 'i' };
+
+    const complaints = await Complaint.find(filter)
+      .populate('user', 'name email role')
+      .sort({ createdAt: -1 });
+
+    debug('Complaints loaded', { count: complaints.length })
+    res.json({ complaints });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getComplaintById = async (req, res, next) => {
+  try {
+    const complaint = await Complaint.findById(req.params.id).populate('user', 'name email role');
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
+    res.json({ complaint });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateComplaintStatus = async (req, res, next) => {
+  debug('Updating complaint status', { userId: req.user?.id, params: req.params, body: req.body })
+  try {
+    const { id } = req.params;
+    const { status, resolution } = req.body;
+    const complaint = await Complaint.findById(id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
+
+    if (status) {
+      complaint.status = status;
+      if (status === 'resolved') {
+        complaint.resolvedAt = new Date();
+      }
+    }
+    if (resolution !== undefined) {
+      complaint.resolution = resolution;
+    }
+
+    await complaint.save();
+    const populated = await complaint.populate('user', 'name email role');
+    debug('Complaint status updated', { complaintId: id, status: populated.status })
+    res.json({ complaint: populated });
   } catch (err) {
     next(err);
   }

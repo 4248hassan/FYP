@@ -10,6 +10,7 @@ router.use('/vendor', require('./vendor'));
 router.use('/admin', require('./admin'));
 router.use('/escrow', require('./escrow'));
 router.use('/uploads', require('./uploads'));
+router.use('/complaints', require('./complaints'));
 
 router.get('/', (req, res) => res.json({ message: 'ResolveIt API' }));
 

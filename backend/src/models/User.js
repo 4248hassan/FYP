@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema(
     postalCode: { type: String },
     role: { type: String, enum: ['customer', 'vendor', 'admin'], default: 'customer' },
     profileImage: { type: String },
+    isBlocked: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

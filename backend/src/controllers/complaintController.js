@@ -28,7 +28,6 @@ exports.createComplaint = async (req, res) => {
       description,
       location,
       user: req.user.id,
-      userId: req.user.id,
     });
 
     const savedComplaint = await complaint.save();

@@ -67,11 +67,12 @@ export default function BookService() {
 
     setIsSubmitting(true)
     try {
-      await api.post('/orders', {
+      await api.post('/bookings', {
         serviceId: formData.serviceId,
-        city: formData.city,
-        address: formData.address,
-        date: formData.date,
+        bookingDate: formData.date,
+        timeSlot: formData.time,
+        location: { address: formData.address, city: formData.city },
+        description: formData.description,
       })
 
       setBookingConfirmed(true)

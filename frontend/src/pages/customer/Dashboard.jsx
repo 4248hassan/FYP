@@ -19,28 +19,29 @@ export default function CustomerDashboard() {
 
   // Fetch user orders
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchBookings = async () => {
       try {
-        const res = await api.get('/orders/user')
-        setOrders(res.data.orders || [])
+        const res = await api.get('/bookings/me')
+        const data = res.data.bookings || []
+        setOrders(data)
       } catch (err) {
-        console.error('Error fetching orders:', err)
-        setError('Failed to load orders')
+        console.error('Error fetching bookings:', err)
+        setError('Failed to load bookings')
       } finally {
         setLoading(false)
       }
     }
-    fetchOrders()
+    fetchBookings()
   }, [])
 
   // Calculate stats from orders
   const stats = useMemo(() => {
-    const activeBookings = orders.filter(order => ['pending', 'accepted'].includes(order.status)).length
+    const activeBookings = orders.filter(order => ['vendor_assigned', 'payment_secured', 'in_progress'].includes(order.status)).length
     const completedServices = orders.filter(order => order.status === 'completed').length
-    const pendingPayments = orders.filter(order => order.status === 'pending').length
+    const pendingPayments = orders.filter(order => order.status === 'payment_secured').length
     const totalSpent = orders
       .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount || 0), 0)
+      .reduce((sum, order) => sum + (order.escrowAmount || 0), 0)
 
     return { activeBookings, completedServices, pendingPayments, totalSpent }
   }, [orders])

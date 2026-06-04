@@ -117,11 +117,9 @@ export default function AdminVendors() {
             ) : vendors.length === 0 ? (
               <Card>
                 <div className="py-12 text-center">
-                  <img
-                    src="https://picsum.photos/seed/handyman/400/300"
-                    alt="No vendors"
-                    className="mx-auto w-full max-w-md h-48 object-cover rounded-lg"
-                  />
+                  <div className="mx-auto w-full max-w-md flex justify-center">
+                    <div className="text-6xl">🔧</div>
+                  </div>
                   <h3 className="mt-4 text-lg font-semibold text-slate-900">No vendors found</h3>
                   <p className="mt-2 text-sm text-slate-600">
                     There are no vendors to manage at the moment.
@@ -131,28 +129,50 @@ export default function AdminVendors() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {vendors.map((vendor) => (
-                  <Card key={vendor._id} className="overflow-hidden">
-                    <div className="aspect-video w-full overflow-hidden bg-slate-200">
-                      <img
-                        src="https://picsum.photos/seed/handyman/400/300"
-                        alt={vendor.name}
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
+                  <Card key={vendor._id} className="overflow-hidden flex flex-col">
+                    {/* ResolveIt Brand Banner */}
+                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-6 flex items-center justify-center">
+                      <div className="text-center">
+                        <h2 className="text-lg font-bold text-white">ResolveIt</h2>
+                        <p className="text-xs text-blue-100 mt-1">Vendor Network</p>
+                      </div>
                     </div>
-                    <div className="p-4">
-                      <div className="mb-3 flex items-center gap-3">
-                        <img
-                          src={`https://i.pravatar.cc/150?u=${vendor.name}`}
-                          alt={vendor.name}
-                          className="h-10 w-10 rounded-full"
-                        />
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-slate-900">{vendor.name}</h3>
-                          <p className="text-xs text-slate-600">
-                            {vendor.totalJobs || 0} jobs completed
-                          </p>
+
+                    <div className="p-4 flex flex-col flex-1">
+                      {/* Vendor Info with Circular Avatar */}
+                      <div className="mb-4 flex items-start gap-4">
+                        {vendor.profileImage ? (
+                          <img
+                            src={vendor.profileImage}
+                            alt={vendor.name}
+                            className="h-16 w-16 flex-shrink-0 rounded-full object-cover border-2 border-slate-200"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <div className="h-16 w-16 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-lg border-2 border-slate-200">
+                            {vendor.name
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .toUpperCase()
+                              .slice(0, 2)}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 pt-1">
+                          <h3 className="font-semibold text-slate-900 text-base">{vendor.name}</h3>
+                          <p className="text-xs text-slate-600 truncate">{vendor.email}</p>
+                          {vendor.phone && <p className="text-xs text-slate-600 mt-1">📞 {vendor.phone}</p>}
                         </div>
                       </div>
+
+                      {/* Additional Info */}
+                      {vendor.city && (
+                        <p className="text-xs text-slate-600 mb-2">📍 {vendor.city}</p>
+                      )}
+
+                      {/* Status Badge */}
                       <div className="mb-4">
                         <span
                           className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
@@ -162,7 +182,9 @@ export default function AdminVendors() {
                           {getStatusLabel(vendor)}
                         </span>
                       </div>
-                      <div className="flex gap-2">
+
+                      {/* Actions */}
+                      <div className="flex gap-2 mt-auto">
                         <Button
                           variant="secondary"
                           onClick={() => handleAction(vendor)}
@@ -180,7 +202,7 @@ export default function AdminVendors() {
                         <Button
                           variant="ghost"
                           onClick={() => handleReject(vendor._id)}
-                          disabled={vendor.isBlocked}
+                          disabled={vendor.isBlocked || submittingId === vendor._id}
                           className="flex-1"
                         >
                           Block

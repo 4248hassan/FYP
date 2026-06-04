@@ -4,20 +4,24 @@ const Service = require('../models/Service');
 
 exports.createBooking = async (req, res, next) => {
   try {
-    const { vendorId, serviceId, bookingDate, timeSlot } = req.body;
+    const { serviceId, bookingDate, timeSlot, description, attachments, location, optionalBudget } = req.body;
     const service = await Service.findById(serviceId);
     if (!service) return res.status(404).json({ message: 'Service not found' });
-    const escrowAmount = service.price;
+
     const booking = await Booking.create({
       customerId: req.user.id,
-      vendorId,
       serviceId,
       bookingDate,
       timeSlot,
-      escrowAmount,
+      description,
+      attachments,
+      location,
+      optionalBudget,
+      // escrowAmount remains 0 until customer pays
+      escrowAmount: 0,
+      status: 'pending_vendor_selection',
     });
-    // create escrow record
-    await EscrowPayment.create({ bookingId: booking._id, customerId: req.user.id, vendorId, amount: escrowAmount, status: 'held' });
+
     res.status(201).json({ booking });
   } catch (err) {
     next(err);

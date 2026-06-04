@@ -11,7 +11,8 @@ exports.protect = async (req, res, next) => {
     const user = await User.findById(decoded.id).select('-password');
     if (!user) return res.status(401).json({ message: 'Not authorized' });
     if (user.isBlocked) return res.status(403).json({ message: 'User is blocked' });
-    req.user = { id: user._id, role: user.role };
+    // attach full user object (without password) for richer checks in controllers
+    req.user = user;
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Not authorized, token invalid' });

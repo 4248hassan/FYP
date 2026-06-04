@@ -3,8 +3,24 @@ const EscrowPayment = require('../models/EscrowPayment');
 
 exports.getPendingRequests = async (req, res, next) => {
   try {
-    const bookings = await Booking.find({ vendorId: req.user.id, status: 'pending' }).populate('serviceId customerId');
+    // return open bookings available for vendors to bid on
+    const bookings = await Booking.find({ status: 'pending_vendor_selection' }).populate('serviceId customerId');
     res.json({ bookings });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getRequestById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const booking = await Booking.findById(id).populate('serviceId customerId');
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    // vendors can view open bookings or bookings assigned to them
+    if (booking.status !== 'pending_vendor_selection' && String(booking.vendorId) !== String(req.user.id)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    res.json({ booking });
   } catch (err) {
     next(err);
   }

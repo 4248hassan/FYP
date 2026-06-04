@@ -24,14 +24,9 @@ export default function JobDetail() {
       try {
         setLoading(true)
         setError(null)
-        const response = await api.get('/vendor/jobs')
+        const response = await api.get(`/vendor/jobs/${id}`)
         if (!isMounted) return
-        const found = (response.data.items || []).find((j) => j.id === id)
-        if (!found) {
-          setError('Job not found.')
-        } else {
-          setJob(found)
-        }
+        setJob(response.data.booking || response.data)
       } catch {
         if (!isMounted) return
         setError('Failed to load job.')
@@ -52,8 +47,10 @@ export default function JobDetail() {
     setSubmitting(true)
     setError(null)
     try {
-      const response = await api.post(`/vendor/jobs/${job.id}/accept`)
-      setJob(response.data.job)
+      const response = await api.post(`/vendor/jobs/${job._id}/accept`, {
+        action: 'accept',
+      })
+      setJob(response.data.booking)
     } catch {
       setError('Failed to accept job.')
     } finally {
@@ -68,6 +65,7 @@ export default function JobDetail() {
       return
     }
     setProofPreview(URL.createObjectURL(file))
+    e.currentTarget.dataset.file = file
   }
 
   const handleSubmitProof = async () => {
@@ -75,13 +73,28 @@ export default function JobDetail() {
     setSubmitting(true)
     setError(null)
     try {
-      await api.post(`/vendor/jobs/${job.id}/proof`, {
-        proof: proofPreview,
+      const fileInput = document.querySelector('input[type="file"]')
+      const file = fileInput?.files?.[0]
+      if (!file) {
+        setError('Please select an image file')
+        setSubmitting(false)
+        return
+      }
+
+      const formData = new FormData()
+      formData.append('mediaUrls', file)
+      formData.append('bookingId', job._id)
+      formData.append('description', `Proof of work for booking ${job._id}`)
+
+      await api.post(`/vendor/jobs/${job._id}/proof`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       })
       setJob((prev) => ({ ...prev, status: 'completed' }))
       navigate('/vendor')
-    } catch {
-      setError('Failed to submit proof.')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to submit proof.')
     } finally {
       setSubmitting(false)
     }
@@ -120,8 +133,8 @@ export default function JobDetail() {
     )
   }
 
-  const canAccept = job.status === 'pending'
-  const canSubmitProof = job.status === 'awaiting_proof' || job.status === 'in_progress'
+  const canAccept = job.status === 'vendor_assigned' || job.status === 'pending_vendor_selection'
+  const canSubmitProof = job.status === 'in_progress' || job.status === 'vendor_assigned' || job.status === 'waiting_customer_approval'
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -132,8 +145,8 @@ export default function JobDetail() {
           <div className="mx-auto max-w-4xl">
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">{job.title}</h1>
-                <p className="mt-1 text-sm text-slate-600">Job ID: {job.id}</p>
+                <h1 className="text-2xl font-bold text-slate-900">{job.serviceId?.name || 'Job'}</h1>
+                <p className="mt-1 text-sm text-slate-600">Job ID: {job._id}</p>
               </div>
               <Link to="/vendor">
                 <Button variant="ghost">Back to Dashboard</Button>
@@ -163,7 +176,7 @@ export default function JobDetail() {
                   <dl className="space-y-3 text-sm">
                     <div className="flex justify-between">
                       <dt className="font-medium text-slate-700">Customer</dt>
-                      <dd className="text-slate-900">{job.customerName}</dd>
+                      <dd className="text-slate-900">{job.customerId?.name || 'Unknown'}</dd>
                     </div>
                     <div className="flex justify-between">
                       <dt className="font-medium text-slate-700">Status</dt>

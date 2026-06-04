@@ -20,7 +20,17 @@ export default function JobList() {
         setLoading(true)
         const response = await api.get('/vendor/jobs')
         if (!isMounted) return
-        setJobs(response.data.items || [])
+        const bookings = response.data.bookings || []
+        setJobs(
+          bookings.map((b) => ({
+            id: b._id,
+            _id: b._id,
+            title: b.serviceId?.name || 'Service',
+            customerName: b.customerId?.name || 'Customer',
+            status: b.status,
+            description: b.description || '',
+          })),
+        )
       } catch (err) {
         console.error('Failed to load jobs')
       } finally {

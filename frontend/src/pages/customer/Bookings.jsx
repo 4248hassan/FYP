@@ -19,17 +19,17 @@ export default function Bookings() {
   useEffect(() => {
     const fetchBookings = async () => {
       try {
-        const response = await api.get('/orders/user')
-        const orders = response.data.orders || []
+        const response = await api.get('/bookings/me')
+        const bookingsData = response.data.bookings || []
         setBookings(
-          orders.map((order) => ({
-            id: order._id,
-            service: order.serviceId?.name || 'Service',
-            date: order.date,
-            time: order.date ? new Date(order.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-            status: order.status,
-            amount: order.amount,
-            address: order.address,
+          bookingsData.map((b) => ({
+            id: b._id,
+            service: b.serviceId?.name || 'Service',
+            date: b.bookingDate,
+            time: b.timeSlot || '',
+            status: b.status,
+            amount: b.escrowAmount || 0,
+            address: b.location?.address || '',
           })),
         )
       } catch {

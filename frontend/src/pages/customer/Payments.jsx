@@ -14,15 +14,15 @@ export default function Payments() {
   useEffect(() => {
     const fetchPayments = async () => {
       try {
-        const res = await api.get('/orders/user')
-        const orders = res.data.orders || []
-        const paymentData = orders.map(order => ({
-          id: order._id,
-          label: `${order.serviceId?.name || 'Service'} - ${order.status}`,
-          amount: order.amount,
-          status: order.status === 'completed' ? 'Released' : order.status === 'pending' ? 'Pending' : 'Held',
-        }))
-        setPayments(paymentData)
+          const res = await api.get('/bookings/me')
+          const bookings = res.data.bookings || []
+          const paymentData = bookings.map((b) => ({
+            id: b._id,
+            label: `${b.serviceId?.name || 'Service'} - ${b.status}`,
+            amount: b.escrowAmount || 0,
+            status: b.status === 'completed' ? 'Released' : b.status === 'payment_secured' ? 'Held' : 'Pending',
+          }))
+          setPayments(paymentData)
       } catch (err) {
         console.error('Error fetching payments:', err)
         setError('Failed to load payments')

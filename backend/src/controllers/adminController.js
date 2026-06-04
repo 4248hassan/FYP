@@ -19,10 +19,13 @@ exports.getAdminStats = async (req, res, next) => {
       openComplaints,
       resolvedComplaints,
       totalBookings,
-      pendingBookings,
+      activeJobs,
       completedBookings,
       verifiedVendors,
       pendingVendors,
+      totalEscrowPayments,
+      totalReleasedRevenue,
+      pendingDisputes,
     ] = await Promise.all([
       User.countDocuments({ role: 'customer' }),
       User.countDocuments({ role: 'vendor' }),
@@ -30,10 +33,16 @@ exports.getAdminStats = async (req, res, next) => {
       Complaint.countDocuments({ status: 'open' }),
       Complaint.countDocuments({ status: 'resolved' }),
       Booking.countDocuments(),
-      Booking.countDocuments({ status: 'pending' }),
+      Booking.countDocuments({ status: { $in: ['vendor_assigned', 'payment_secured', 'in_progress'] } }),
       Booking.countDocuments({ status: 'completed' }),
       User.countDocuments({ role: 'vendor', isVerified: true }),
       User.countDocuments({ role: 'vendor', isVerified: false }),
+      EscrowPayment.countDocuments(),
+      EscrowPayment.aggregate([
+        { $match: { status: 'released' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]).then((r) => (r[0] ? r[0].total : 0)),
+      Booking.countDocuments({ status: 'disputed' }),
     ]);
 
     debug('Admin stats result', {
@@ -56,10 +65,13 @@ exports.getAdminStats = async (req, res, next) => {
       openComplaints,
       resolvedComplaints,
       totalBookings,
-      pendingBookings,
+      activeJobs,
       completedBookings,
       verifiedVendors,
       pendingVendors,
+      totalEscrowPayments,
+      totalReleasedRevenue,
+      pendingDisputes,
     });
   } catch (err) {
     next(err);
@@ -70,8 +82,12 @@ exports.listUsers = async (req, res, next) => {
   debug('Fetching all users for admin', { userId: req.user?.id })
   try {
     const [customers, vendors] = await Promise.all([
-      User.find({ role: 'customer' }).select('-password'),
-      User.find({ role: 'vendor' }).select('-password'),
+      User.find({ role: 'customer' })
+        .select('-password')
+        .select('name email phone city address profileImage isBlocked createdAt'),
+      User.find({ role: 'vendor' })
+        .select('-password')
+        .select('name email phone city address profileImage isVerified isBlocked createdAt'),
     ]);
     debug('Admin users loaded', { customersCount: customers.length, vendorsCount: vendors.length })
     res.json({ customers, vendors });
@@ -83,7 +99,11 @@ exports.listUsers = async (req, res, next) => {
 exports.listVendors = async (req, res, next) => {
   debug('Fetching vendor list for admin', { userId: req.user?.id })
   try {
-    const vendors = await User.find({ role: 'vendor' }).select('-password').sort({ createdAt: -1 });
+    const vendors = await User.find({ role: 'vendor' })
+      .select('-password')
+      .select('name email phone city address profileImage isVerified isBlocked createdAt updatedAt')
+      .sort({ createdAt: -1 });
+    debug('Vendors loaded', { count: vendors.length, sample: vendors[0] ? { name: vendors[0].name, hasProfile: !!vendors[0].profileImage } : 'none' })
     res.json({ vendors });
   } catch (err) {
     next(err);
@@ -113,18 +133,25 @@ exports.updateUserStatus = async (req, res, next) => {
     }
 
     await user.save();
+    
+    // Return full vendor object with all fields including profileImage
     const responseUser = {
       _id: user._id,
       id: user._id,
       name: user.name,
       email: user.email,
+      phone: user.phone,
+      city: user.city,
+      address: user.address,
       role: user.role,
+      profileImage: user.profileImage,
       isBlocked: user.isBlocked,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
 
-    debug('User status updated', responseUser)
+    debug('User status updated', { id: responseUser._id, name: responseUser.name, isVerified: responseUser.isVerified, isBlocked: responseUser.isBlocked })
     res.json({ user: responseUser });
   } catch (err) {
     next(err);

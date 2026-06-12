@@ -2,31 +2,57 @@ const Offer = require('../models/Offer');
 const Booking = require('../models/Booking');
 const socket = require('../utils/socket');
 const Notification = require('../models/Notification');
+const STATUS = require('../constants/status.constants');
 
+// ─── Vendor Submits an Offer ─────────────────────────────────────────────────
 exports.createOffer = async (req, res, next) => {
   try {
     const { bookingId, estimatedCost, estimatedTime, message } = req.body;
-    // vendor must be verified
+
     if (!req.user.isVerified || req.user.role !== 'vendor') {
       return res.status(403).json({ message: 'Only verified vendors can submit offers' });
     }
+
     const booking = await Booking.findById(bookingId);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
-    if (booking.status !== 'pending_vendor_selection' && booking.status !== 'offers_received') {
-      return res.status(400).json({ message: 'Booking not open for offers' });
+
+    const openStatuses = [STATUS.BOOKING_CREATED, STATUS.OFFER_RECEIVED];
+    if (!openStatuses.includes(booking.status)) {
+      return res.status(400).json({ message: 'Booking is not open for offers' });
     }
 
-    const offer = await Offer.create({ bookingId, vendorId: req.user.id, estimatedCost, estimatedTime, message });
+    // Check if this vendor already submitted an offer for this booking
+    const existing = await Offer.findOne({ bookingId, vendorId: req.user.id });
+    if (existing) {
+      return res.status(400).json({ message: 'You have already submitted an offer for this booking' });
+    }
 
-    // update booking status to offers_received
-    booking.status = 'offers_received';
-    await booking.save();
+    const offer = await Offer.create({
+      bookingId,
+      vendorId: req.user.id,
+      estimatedCost,
+      estimatedTime,
+      message,
+    });
 
-    // notify customer via socket if connected
+    // Update booking status to OFFER_RECEIVED
+    if (booking.status === STATUS.BOOKING_CREATED) {
+      booking.status = STATUS.OFFER_RECEIVED;
+      await booking.save();
+    }
+
+    // Notify customer
     const io = socket.get();
-    // save notification
-    await Notification.create({ userId: booking.customerId, type: 'new_offer', payload: { bookingId: booking._id, offerId: offer._id } });
-    if (io && booking.customerId) io.to(`user:${booking.customerId}`).emit('notification', { type: 'new_offer', bookingId: booking._id, offer });
+    await Notification.create({
+      userId: booking.customerId,
+      type: 'new_offer',
+      payload: { bookingId: booking._id, offerId: offer._id },
+    });
+    if (io && booking.customerId) {
+      io.to(`user:${booking.customerId}`).emit('notification', {
+        type: 'new_offer', bookingId: booking._id, offer,
+      });
+    }
 
     res.status(201).json({ offer });
   } catch (err) {
@@ -34,6 +60,7 @@ exports.createOffer = async (req, res, next) => {
   }
 };
 
+// ─── Get All Offers for a Booking ────────────────────────────────────────────
 exports.getOffersForBooking = async (req, res, next) => {
   try {
     const { bookingId } = req.params;
@@ -44,6 +71,7 @@ exports.getOffersForBooking = async (req, res, next) => {
   }
 };
 
+// ─── Customer Accepts an Offer (Selects a Vendor) ────────────────────────────
 exports.acceptOffer = async (req, res, next) => {
   try {
     const { offerId } = req.params;
@@ -53,24 +81,38 @@ exports.acceptOffer = async (req, res, next) => {
     const booking = await Booking.findById(offer.bookingId);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-    // only customer who created booking can accept
-    if (String(booking.customerId) !== String(req.user.id)) return res.status(403).json({ message: 'Not authorized' });
+    if (String(booking.customerId) !== String(req.user.id)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
 
-    // mark all other offers as rejected
-    await Offer.updateMany({ bookingId: booking._id, _id: { $ne: offer._id } }, { status: 'rejected' });
+    // Reject all other offers for this booking
+    await Offer.updateMany(
+      { bookingId: booking._id, _id: { $ne: offer._id } },
+      { status: 'rejected' }
+    );
 
-    // accept this offer
+    // Accept selected offer
     offer.status = 'accepted';
     await offer.save();
 
+    // Assign vendor and set escrow amount
     booking.vendorId = offer.vendorId;
     booking.escrowAmount = offer.estimatedCost;
-    booking.status = 'vendor_assigned';
+    booking.status = STATUS.VENDOR_ASSIGNED;
     await booking.save();
 
+    // Notify the selected vendor
     const io = socket.get();
-    await Notification.create({ userId: offer.vendorId, type: 'vendor_assigned', payload: { bookingId: booking._id, offerId: offer._id } });
-    if (io && offer.vendorId) io.to(`user:${offer.vendorId}`).emit('notification', { type: 'vendor_assigned', bookingId: booking._id, offer });
+    await Notification.create({
+      userId: offer.vendorId,
+      type: 'vendor_assigned',
+      payload: { bookingId: booking._id, offerId: offer._id },
+    });
+    if (io && offer.vendorId) {
+      io.to(`user:${offer.vendorId}`).emit('notification', {
+        type: 'vendor_assigned', bookingId: booking._id, offer,
+      });
+    }
 
     res.json({ booking, offer });
   } catch (err) {

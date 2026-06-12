@@ -1,47 +1,62 @@
 const mongoose = require('mongoose');
+const STATUS = require('../constants/status.constants');
 
 const bookingSchema = new mongoose.Schema(
   {
-    // Customer who created the service request
+    // ─── Participants ─────────────────────────────────────────────────────────
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    // Assigned vendor (optional until customer chooses)
-    vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    // Service type selected by customer
-    serviceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
-    // Requested date (optional)
+    vendorId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    // ─── Service Info ─────────────────────────────────────────────────────────
+    serviceId:            { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
+    selectedService:      { type: String },
+    serviceStartingPrice: { type: Number },
+
+    // ─── Scheduling ───────────────────────────────────────────────────────────
     bookingDate: { type: Date },
-    timeSlot: { type: String },
-    // Detailed description & attachments
+    timeSlot:    { type: String },
+
+    // ─── Problem Details ──────────────────────────────────────────────────────
     description: { type: String, trim: true },
     attachments: [{ type: String }],
-    // Location information
+
+    // ─── Location ─────────────────────────────────────────────────────────────
     location: {
-      address: { type: String },
-      city: { type: String },
-      postalCode: { type: String },
+      address:     { type: String },
+      city:        { type: String },
+      postalCode:  { type: String },
       coordinates: { type: [Number] }, // [lng, lat]
     },
-    // Optional budget provided by customer
+
+    // ─── Pricing ──────────────────────────────────────────────────────────────
     optionalBudget: { type: Number },
-    // Workflow status - start with pending_vendor_selection
+    escrowAmount:   { type: Number, default: 0 },
+    amount:         { type: Number },
+
+    // ─── Workflow Status ──────────────────────────────────────────────────────
     status: {
       type: String,
-      enum: [
-        'pending_vendor_selection',
-        'offers_received',
-        'vendor_assigned',
-        'payment_secured',
-        'in_progress',
-        'waiting_customer_approval',
-        'revision_requested',
-        'disputed',
-        'completed',
-        'cancelled',
-      ],
-      default: 'pending_vendor_selection',
+      enum: Object.values(STATUS),
+      default: STATUS.BOOKING_CREATED,
     },
-    // amount expected to be held in escrow (can be set when customer pays)
-    escrowAmount: { type: Number, default: 0 },
+
+    // ─── Payment Status ───────────────────────────────────────────────────────
+    paymentStatus: {
+      type: String,
+      enum: ['UNPAID', 'ESCROW_HELD', 'RELEASED', 'REFUNDED', 'PAID', 'IN_ESCROW'],
+      default: 'UNPAID',
+    },
+
+    // ─── Customer Response to Proof ───────────────────────────────────────────
+    // Stored when customer reviews vendor's submitted proof of work
+    customerDecision: {
+      action: { type: String, enum: ['approve', 'revision', 'dispute'] },
+      notes:  { type: String },
+      decidedAt: { type: Date },
+    },
+
+    // ─── Revision Notes ───────────────────────────────────────────────────────
+    revisionNotes: { type: String },
   },
   { timestamps: true }
 );

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { getAvatarUrl } from '../../assets/images'
 import Button from '../ui/Button'
+import Avatar from '../ui/Avatar'
 
 const publicNavLinks = [
   { label: 'Home', to: '/' },
@@ -32,22 +33,25 @@ export default function Navbar() {
   const displayName = user?.name || user?.email || 'User'
   const displayEmail = user?.email || ''
 
-  const profileOptions = []
-  if (user?.role === 'customer') {
-    profileOptions.push({ label: 'My Bookings', to: '/customer/bookings' })
+  const getDashboardRoute = (role) => {
+    if (role === 'customer') return '/customer'
+    if (role === 'vendor') return '/vendor/dashboard'
+    if (role === 'admin') return '/admin'
+    return '/'
   }
-  if (user?.role === 'vendor') {
-    profileOptions.push({ label: 'Assigned Jobs', to: '/vendor/jobs' })
+
+  const getProfileRoute = (role) => {
+    if (role === 'customer') return '/customer/profile'
+    if (role === 'vendor') return '/vendor/profile'
+    if (role === 'admin') return '/admin/profile'
+    return '/auth/login'
   }
-  const profileRoute =
-    (user?.role === 'customer' && '/customer/profile') ||
-    (user?.role === 'vendor' && '/vendor/profile') ||
-    (user?.role === 'admin' && '/admin/profile') ||
-    '/auth/login'
-  if (profileRoute) {
-    profileOptions.push({ label: 'Profile', to: profileRoute })
-  }
-  profileOptions.push({ label: 'Logout', onClick: handleLogout })
+
+  const profileOptions = [
+    { label: 'Dashboard', to: getDashboardRoute(user?.role) },
+    { label: 'Profile', to: getProfileRoute(user?.role) },
+    { label: 'Logout', onClick: handleLogout }
+  ]
 
   useEffect(() => {
     if (!profileMenuOpen) return
@@ -120,11 +124,11 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setProfileMenuOpen((prev) => !prev)}
-              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white transition hover:shadow-sm"
+              className="flex items-center justify-center rounded-full border border-slate-200 bg-white transition hover:shadow-sm"
               aria-label="Open profile menu"
               aria-expanded={profileMenuOpen}
             >
-              <img src={profileAvatar} alt="Profile" className="h-full w-full object-cover" />
+              <Avatar src={user?.profileImage} name={user?.name} sizeClassName="h-10 w-10 text-sm" />
             </button>
 
             <div
@@ -133,8 +137,8 @@ export default function Navbar() {
               }`}
             >
               <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
-                <div className="h-14 w-14 overflow-hidden rounded-full border border-slate-200">
-                  <img src={profileAvatar} alt="Profile" className="h-full w-full object-cover" />
+                <div className="border border-slate-200 rounded-full">
+                  <Avatar src={user?.profileImage} name={user?.name} sizeClassName="h-14 w-14 text-lg" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{displayName}</p>

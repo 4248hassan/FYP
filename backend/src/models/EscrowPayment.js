@@ -7,6 +7,9 @@ const escrowSchema = new mongoose.Schema(
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     amount: { type: Number, required: true },
     status: { type: String, enum: ['held', 'released', 'refunded'], default: 'held' },
+    paymentStatus: { type: String, default: 'HELD' },
+    releasedAt: { type: Date },
+    releasedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     // link to Payment record (transaction)
     paymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' },
     // audit trail

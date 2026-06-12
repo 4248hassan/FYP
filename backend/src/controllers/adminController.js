@@ -1,7 +1,13 @@
-                                                                                                                                                                                                                                                                                                                                            const User = require('../models/User');
+const User = require('../models/User');
 const Booking = require('../models/Booking');
 const Complaint = require('../models/Complaint');
 const EscrowPayment = require('../models/EscrowPayment');
+const Payment = require('../models/Payment');
+const AdminWallet = require('../models/AdminWallet');
+const VendorWallet = require('../models/VendorWallet');
+const socket = require('../utils/socket');
+const Notification = require('../models/Notification');
+const STATUS = require('../constants/status.constants');
 
 const debug = (message, data) => {
   if (process.env.NODE_ENV !== 'production') {
@@ -13,6 +19,7 @@ exports.getAdminStats = async (req, res, next) => {
   debug('Fetching admin stats for user', { userId: req.user?.id, role: req.user?.role })
   try {
     const [
+      totalUsers,
       totalCustomers,
       totalVendors,
       totalComplaints,
@@ -26,15 +33,20 @@ exports.getAdminStats = async (req, res, next) => {
       totalEscrowPayments,
       totalReleasedRevenue,
       pendingDisputes,
+      adminWallet,
+      activeBookings,
+      pendingBookings,
+      escrowAmount,
     ] = await Promise.all([
+      User.countDocuments(),
       User.countDocuments({ role: 'customer' }),
       User.countDocuments({ role: 'vendor' }),
       Complaint.countDocuments(),
       Complaint.countDocuments({ status: 'open' }),
       Complaint.countDocuments({ status: 'resolved' }),
       Booking.countDocuments(),
-      Booking.countDocuments({ status: { $in: ['vendor_assigned', 'payment_secured', 'in_progress'] } }),
-      Booking.countDocuments({ status: 'completed' }),
+      Booking.countDocuments({ status: { $in: ['vendor_assigned', 'VENDOR_ASSIGNED', 'payment_secured', 'PAYMENT_SECURED', 'in_progress', 'WORK_IN_PROGRESS'] } }),
+      Booking.countDocuments({ status: { $in: ['completed', 'COMPLETED'] } }),
       User.countDocuments({ role: 'vendor', isVerified: true }),
       User.countDocuments({ role: 'vendor', isVerified: false }),
       EscrowPayment.countDocuments(),
@@ -42,23 +54,36 @@ exports.getAdminStats = async (req, res, next) => {
         { $match: { status: 'released' } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]).then((r) => (r[0] ? r[0].total : 0)),
-      Booking.countDocuments({ status: 'disputed' }),
+      Booking.countDocuments({ status: { $in: ['disputed', 'DISPUTED'] } }),
+      AdminWallet.findOne(),
+      Booking.countDocuments({ status: { $in: ['vendor_assigned', 'VENDOR_ASSIGNED', 'payment_secured', 'PAYMENT_SECURED', 'in_progress', 'WORK_IN_PROGRESS', 'AWAITING_APPROVAL', 'PAYMENT_PENDING', 'COMPLETED_PENDING_RELEASE', 'REVISION_REQUESTED', 'DISPUTED'] } }),
+      Booking.countDocuments({ status: { $nin: ['completed', 'COMPLETED'] } }),
+      EscrowPayment.aggregate([
+        { $match: { status: 'held' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]).then((r) => (r[0] ? r[0].total : 0)),
     ]);
 
+    const totalEscrowAmount = adminWallet ? adminWallet.escrowBalance : 0;
+    const totalRevenue = totalReleasedRevenue;
+
     debug('Admin stats result', {
+      totalUsers,
       totalCustomers,
       totalVendors,
       totalComplaints,
       openComplaints,
       resolvedComplaints,
       totalBookings,
-      pendingBookings,
+      activeBookings,
       completedBookings,
-      verifiedVendors,
-      pendingVendors,
+      pendingBookings,
+      totalRevenue,
+      escrowAmount,
     });
 
     res.json({
+      totalUsers,
       totalCustomers,
       totalVendors,
       totalComplaints,
@@ -71,7 +96,12 @@ exports.getAdminStats = async (req, res, next) => {
       pendingVendors,
       totalEscrowPayments,
       totalReleasedRevenue,
+      totalEscrowAmount,
       pendingDisputes,
+      activeBookings,
+      pendingBookings,
+      totalRevenue,
+      escrowAmount,
     });
   } catch (err) {
     next(err);
@@ -229,23 +259,215 @@ exports.updateComplaintStatus = async (req, res, next) => {
 
 exports.listEscrows = async (req, res, next) => {
   try {
-    const escrows = await EscrowPayment.find().populate('bookingId customerId vendorId');
+    const { status } = req.query;
+    const filter = status ? { status } : {};
+    const escrows = await EscrowPayment.find(filter)
+      .populate('bookingId', 'status paymentStatus selectedService escrowAmount serviceStartingPrice')
+      .populate('customerId', 'name email')
+      .populate('vendorId', 'name email walletBalance')
+      .populate('paymentId')
+      .sort({ createdAt: -1 });
     res.json({ escrows });
   } catch (err) {
     next(err);
   }
 };
 
+// ─── Admin Releases Escrow to Vendor ──────────────────────────────────────────
 exports.releaseEscrow = async (req, res, next) => {
   try {
-    const { id } = req.params; // escrow id
-    const escrow = await EscrowPayment.findById(id).populate('bookingId');
+    const { id } = req.params;
+    const escrow = await EscrowPayment.findById(id);
     if (!escrow) return res.status(404).json({ message: 'Escrow not found' });
-    const booking = escrow.bookingId;
-    if (booking.status !== 'completed') return res.status(400).json({ message: 'Booking not completed' });
+    if (escrow.status !== 'held') {
+      return res.status(400).json({ message: `Escrow is already ${escrow.status}` });
+    }
+
+    const booking = await Booking.findById(escrow.bookingId);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    if (booking.status !== STATUS.PAYMENT_PENDING && booking.status !== STATUS.COMPLETED && booking.status !== 'COMPLETED_PENDING_RELEASE') {
+      return res.status(400).json({ message: 'Booking must be ready for release (PAYMENT_PENDING or COMPLETED_PENDING_RELEASE)' });
+    }
+
+    const amount = escrow.amount;
+    const commissionAmount = Number((amount * 0.05).toFixed(2));
+    const vendorPayout = Number((amount * 0.95).toFixed(2));
+
+    // 1. Mark escrow released + add audit trail
     escrow.status = 'released';
+    escrow.paymentStatus = 'RELEASED';
+    escrow.releasedAt = new Date();
+    escrow.releasedBy = req.user.id;
+    escrow.history.push({ action: 'released', by: req.user.id, role: 'admin', at: new Date() });
     await escrow.save();
-    res.json({ escrow });
+
+    // 2. Credit vendor wallet (VendorWallet model)
+    let vendorWallet = await VendorWallet.findOne({ vendorId: escrow.vendorId });
+    if (!vendorWallet) {
+      vendorWallet = await VendorWallet.create({ vendorId: escrow.vendorId, balance: 0, transactions: [] });
+    }
+    vendorWallet.balance = Number((vendorWallet.balance + vendorPayout).toFixed(2));
+    vendorWallet.transactions.push({
+      amount: vendorPayout,
+      type: 'credit',
+      description: `Payout (95%) of PKR ${vendorPayout.toLocaleString()} received for booking ${booking._id}`,
+      bookingId: booking._id,
+      status: 'Paid',
+    });
+    await vendorWallet.save();
+
+    // Legacy backup for User.walletBalance
+    await User.findByIdAndUpdate(escrow.vendorId, {
+      $inc: { walletBalance: vendorPayout },
+    });
+
+    // 3. Update linked payment record
+    if (escrow.paymentId) {
+      await Payment.findByIdAndUpdate(escrow.paymentId, {
+        paymentStatus: 'RELEASED',
+        releaseStatus: 'released',
+        releaseDate: new Date(),
+        releasedAt: new Date(),
+        escrowStatus: 'released',
+      });
+    }
+
+    // Update system-wide AdminWallet (commissionBalance += commissionAmount, escrowBalance -= amount)
+    let adminWallet = await AdminWallet.findOne();
+    if (!adminWallet) {
+      adminWallet = await AdminWallet.create({ commissionBalance: 0, escrowBalance: 0, transactions: [] });
+    }
+    adminWallet.commissionBalance = Number((adminWallet.commissionBalance + commissionAmount).toFixed(2));
+    adminWallet.escrowBalance = Number((adminWallet.escrowBalance - amount).toFixed(2));
+    adminWallet.transactions.push({
+      amount: commissionAmount,
+      type: 'commission',
+      description: `Commission of 5% (PKR ${commissionAmount.toLocaleString()}) earned from booking ${booking._id}`,
+      bookingId: booking._id,
+    });
+    adminWallet.transactions.push({
+      amount: -amount,
+      type: 'escrow_release',
+      description: `Escrow release of PKR ${amount.toLocaleString()} for booking ${booking._id}`,
+      bookingId: booking._id,
+    });
+    await adminWallet.save();
+
+    // 4. Mark booking COMPLETED and paymentStatus = PAID
+    booking.status = STATUS.COMPLETED;
+    booking.paymentStatus = 'PAID';
+    await booking.save();
+
+    // 5. Notify vendor
+    const io = socket.get();
+    await Notification.create({
+      userId: escrow.vendorId,
+      type: 'payment_released',
+      payload: { escrowId: escrow._id, amount: escrow.amount },
+    });
+    if (io && escrow.vendorId) {
+      io.to(`user:${escrow.vendorId}`).emit('notification', {
+        type: 'payment_released', escrowId: escrow._id, amount: escrow.amount,
+      });
+    }
+    // Notify customer
+    await Notification.create({
+      userId: escrow.customerId,
+      type: 'booking_completed',
+      payload: { bookingId: booking._id },
+    });
+
+    res.json({ message: 'Payment released to vendor successfully', escrow, booking });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Admin Refunds Escrow to Customer ─────────────────────────────────────────
+exports.refundEscrow = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const escrow = await EscrowPayment.findById(id);
+    if (!escrow) return res.status(404).json({ message: 'Escrow not found' });
+    if (escrow.status !== 'held') {
+      return res.status(400).json({ message: `Escrow is already ${escrow.status}` });
+    }
+
+    escrow.status = 'refunded';
+    escrow.history.push({ action: 'refunded', by: req.user.id, role: 'admin', notes: reason, at: new Date() });
+    await escrow.save();
+
+    if (escrow.paymentId) {
+      await Payment.findByIdAndUpdate(escrow.paymentId, {
+        paymentStatus: 'refunded',
+        releaseStatus: 'refunded',
+        releaseDate: new Date(),
+      });
+    }
+
+    await Booking.findByIdAndUpdate(escrow.bookingId, {
+      status: STATUS.CANCELLED,
+      paymentStatus: 'REFUNDED',
+    });
+
+    const io = socket.get();
+    await Notification.create({
+      userId: escrow.customerId,
+      type: 'payment_refunded',
+      payload: { escrowId: escrow._id, amount: escrow.amount, reason },
+    });
+    if (io && escrow.customerId) {
+      io.to(`user:${escrow.customerId}`).emit('notification', {
+        type: 'payment_refunded', escrowId: escrow._id,
+      });
+    }
+
+    res.json({ message: 'Escrow refunded to customer', escrow });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Admin Wallet Details ───────────────────────────────────────────────────
+exports.getAdminWallet = async (req, res, next) => {
+  try {
+    let wallet = await AdminWallet.findOne().populate({
+      path: 'transactions.bookingId',
+      populate: [
+        { path: 'customerId', select: 'name email' },
+        { path: 'vendorId', select: 'name email' },
+      ],
+    });
+    if (!wallet) {
+      wallet = await AdminWallet.create({ commissionBalance: 0, escrowBalance: 0, transactions: [] });
+      // Fetch again to have populated array empty or load correctly
+      wallet = await AdminWallet.findById(wallet._id).populate({
+        path: 'transactions.bookingId',
+        populate: [
+          { path: 'customerId', select: 'name email' },
+          { path: 'vendorId', select: 'name email' },
+        ],
+      });
+    }
+
+    // Released payments: sum of all escrows that have status 'released'
+    const releasedList = await EscrowPayment.find({ status: 'released' });
+    const totalReleased = releasedList.reduce((sum, item) => sum + item.amount, 0);
+
+    // Pending payments: sum of all escrows that have status 'held'
+    const pendingList = await EscrowPayment.find({ status: 'held' });
+    const pendingCount = pendingList.length;
+    const pendingAmount = pendingList.reduce((sum, item) => sum + item.amount, 0);
+
+    res.json({
+      commissionBalance: wallet.commissionBalance,
+      escrowBalance: wallet.escrowBalance,
+      totalReleased,
+      pendingCount,
+      pendingAmount,
+      transactions: [...wallet.transactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    });
   } catch (err) {
     next(err);
   }

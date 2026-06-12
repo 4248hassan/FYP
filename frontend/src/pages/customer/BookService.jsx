@@ -5,10 +5,29 @@ import Navbar from '../../components/layout/Navbar'
 import Sidebar from '../../components/layout/Sidebar'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import { getServicePrice, formatPKR, formatDateForInput } from '../../utils'
+import DatePicker from '../../components/ui/DatePicker'
 
 const timeSlots = [
   '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
   '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'
+]
+
+const serviceOptions = [
+  'Plumbing',
+  'Electrical',
+  'AC Repair',
+  'Appliance Repair',
+  'CCTV Installation',
+  'Carpenter',
+  'Painter',
+  'Cleaning Service',
+  'Generator Repair',
+  'IT Support',
+  'Smart Home Setup',
+  'Home Maintenance',
+  'Handyman',
+  'Other'
 ]
 
 export default function BookService() {
@@ -21,6 +40,7 @@ export default function BookService() {
     address: '',
     city: 'Lahore',
     description: '',
+    optionalBudget: '',
   })
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -42,7 +62,13 @@ export default function BookService() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    setFormData((prev) => {
+      const nextData = { ...prev, [name]: value }
+      if (name === 'serviceId') {
+        nextData.optionalBudget = value ? getServicePrice(value) : ''
+      }
+      return nextData
+    })
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }))
     }
@@ -67,12 +93,39 @@ export default function BookService() {
 
     setIsSubmitting(true)
     try {
+      const selectedOption = formData.serviceId
+      const matchedService = services.find((service) => {
+        const nameLower = service.name.toLowerCase()
+        const catLower = (service.category || '').toLowerCase()
+        const optLower = selectedOption.toLowerCase()
+
+        if (optLower === 'plumbing') return nameLower.includes('plumbing') || catLower.includes('plumbing')
+        if (optLower === 'electrical') return nameLower.includes('electr') || catLower.includes('electrical') || catLower.includes('electrician')
+        if (optLower === 'ac repair') return nameLower.includes('ac') || catLower.includes('ac')
+        if (optLower === 'appliance repair') return nameLower.includes('appliance') || catLower.includes('appliances')
+        if (optLower === 'cctv installation') return nameLower.includes('cctv') || catLower.includes('cctv')
+        if (optLower === 'carpenter') return nameLower.includes('carpenter') || nameLower.includes('carpentry') || catLower.includes('carpentry')
+        if (optLower === 'painter') return nameLower.includes('paint') || catLower.includes('painting')
+        if (optLower === 'cleaning service') return nameLower.includes('clean') || catLower.includes('cleaning')
+        if (optLower === 'generator repair') return nameLower.includes('generator') || catLower.includes('generator')
+        if (optLower === 'it support') return nameLower.includes('it support') || nameLower.includes('it') || catLower.includes('it')
+        if (optLower === 'smart home setup') return nameLower.includes('smart home') || catLower.includes('smart_home')
+        if (optLower === 'home maintenance') return nameLower.includes('maintenance') || catLower.includes('maintenance') || nameLower.includes('locks')
+        if (optLower === 'handyman') return nameLower.includes('handyman') || catLower.includes('handyman')
+        return false
+      })
+
+      const finalServiceId = matchedService ? matchedService._id : (services[0]?._id || selectedOption)
+
       await api.post('/bookings', {
-        serviceId: formData.serviceId,
+        serviceId: finalServiceId,
+        selectedService: selectedOption,
+        serviceStartingPrice: getServicePrice(selectedOption),
         bookingDate: formData.date,
         timeSlot: formData.time,
         location: { address: formData.address, city: formData.city },
         description: formData.description,
+        optionalBudget: formData.optionalBudget ? Number(formData.optionalBudget) : undefined,
       })
 
       setBookingConfirmed(true)
@@ -87,7 +140,7 @@ export default function BookService() {
   }
 
   // Get minimum date (today)
-  const today = new Date().toISOString().split('T')[0]
+  const today = formatDateForInput(new Date())
 
   if (bookingConfirmed) {
     return (
@@ -137,12 +190,17 @@ export default function BookService() {
                   } bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500`}
                 >
                   <option value="">Select a service...</option>
-                  {services.map((service) => (
-                    <option key={service._id} value={service._id}>
-                      {service.name} - PKR {service.basePrice}
+                  {serviceOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt} - {formatPKR(getServicePrice(opt))}
                     </option>
                   ))}
                 </select>
+                {formData.serviceId && (
+                  <div className="mt-2 text-sm font-semibold text-slate-700">
+                    Starting Price: Rs. {getServicePrice(formData.serviceId).toLocaleString('en-US')}
+                  </div>
+                )}
                 {errors.serviceId && <p className="mt-1 text-xs text-red-600">{errors.serviceId}</p>}
                 {loadError && <p className="mt-1 text-xs text-red-600">{loadError}</p>}
               </div>
@@ -150,18 +208,14 @@ export default function BookService() {
               {/* Date and Time Selection */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label htmlFor="date" className="block text-sm font-medium text-slate-700 mb-2">
-                    Select Date <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    type="date"
+                  <DatePicker
+                    label={<span>Select Date <span className="text-red-500">*</span></span>}
                     name="date"
                     value={formData.date}
                     onChange={handleChange}
                     min={today}
-                    className={errors.date ? 'border-red-300' : ''}
+                    error={errors.date}
                   />
-                  {errors.date && <p className="mt-1 text-xs text-red-600">{errors.date}</p>}
                 </div>
 
                 <div>
@@ -212,6 +266,22 @@ export default function BookService() {
                   value={formData.city}
                   onChange={handleChange}
                   placeholder="City"
+                  className="border-slate-300"
+                />
+              </div>
+
+              {/* Budget */}
+              <div>
+                <label htmlFor="optionalBudget" className="block text-sm font-medium text-slate-700 mb-2">
+                  Budget (PKR) <span className="text-xs text-slate-500">(Optional)</span>
+                </label>
+                <Input
+                  type="number"
+                  id="optionalBudget"
+                  name="optionalBudget"
+                  value={formData.optionalBudget}
+                  onChange={handleChange}
+                  placeholder="Enter your budget"
                   className="border-slate-300"
                 />
               </div>

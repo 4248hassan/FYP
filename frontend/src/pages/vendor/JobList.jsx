@@ -6,6 +6,7 @@ import Loader from '../../components/ui/Loader'
 import Button from '../../components/ui/Button'
 import Navbar from '../../components/layout/Navbar'
 import Sidebar from '../../components/layout/Sidebar'
+import { getServiceImage } from '../../assets/images'
 
 export default function JobList() {
   const [jobs, setJobs] = useState([])
@@ -120,12 +121,10 @@ export default function JobList() {
             ) : filteredJobs.length === 0 ? (
               <Card>
                 <div className="py-12 text-center">
-                  <img
-                    src="https://picsum.photos/seed/handyman/400/300"
-                    alt="No jobs"
-                    className="mx-auto w-full max-w-md h-48 object-cover rounded-lg"
-                  />
-                  <h3 className="mt-4 text-lg font-semibold text-slate-900">No jobs found</h3>
+                  <div className="mx-auto w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl mb-4">
+                    📋
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900">No jobs found</h3>
                   <p className="mt-2 text-sm text-slate-600">
                     {filter === 'all'
                       ? "You don't have any jobs yet."
@@ -135,34 +134,43 @@ export default function JobList() {
               </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredJobs.map((job) => (
-                  <Link key={job.id} to={`/vendor/jobs/${job.id}`} className="block">
-                    <Card className="h-full transition-shadow hover:shadow-md">
-                      <div className="aspect-video w-full overflow-hidden rounded-lg bg-slate-200">
-                        <img
-                          src="https://picsum.photos/seed/handyman/400/300"
-                          alt={job.title}
-                          className="w-full h-48 object-cover rounded-lg"
-                        />
-                      </div>
-                      <div className="mt-4">
-                        <h3 className="font-semibold text-slate-900">{job.title}</h3>
-                        <p className="mt-1 text-xs text-slate-600">
-                          Customer: {job.customerName}
-                        </p>
-                        <div className="mt-3">
-                          <span
-                            className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
-                              job.status,
-                            )}`}
-                          >
-                            {job.status}
-                          </span>
+                {filteredJobs.map((job) => {
+                  const serviceImg = getServiceImage(job.title)
+                  return (
+                    <Link key={job.id} to={`/vendor/jobs/${job.id}`} className="block">
+                      <Card className="h-full transition-shadow hover:shadow-md">
+                        <div className="aspect-video w-full overflow-hidden rounded-lg bg-slate-200">
+                          {serviceImg ? (
+                            <img
+                              src={serviceImg}
+                              alt={job.title}
+                              className="w-full h-48 object-cover rounded-lg"
+                            />
+                          ) : (
+                            <div className="w-full h-48 bg-slate-100 flex flex-col items-center justify-center border border-slate-200 rounded-lg">
+                              <span className="text-4xl text-slate-400">🛠️</span>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    </Card>
-                  </Link>
-                ))}
+                        <div className="mt-4">
+                          <h3 className="font-semibold text-slate-900">{job.title}</h3>
+                          <p className="mt-1 text-xs text-slate-600">
+                            Customer: {job.customerName}
+                          </p>
+                          <div className="mt-3">
+                            <span
+                              className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
+                                job.status,
+                              )}`}
+                            >
+                              {job.status}
+                            </span>
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+                  )
+                })}
               </div>
             )}
           </div>

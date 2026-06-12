@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema(
     profileImage: { type: String },
     isBlocked: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
+    walletBalance: { type: Number, default: 0 }, // credited when admin releases escrow
   },
   { timestamps: true }
 );

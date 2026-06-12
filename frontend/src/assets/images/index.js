@@ -129,3 +129,27 @@ export const getAvatarUrl = (email, size = 150) => {
   return `https://i.pravatar.cc/${size}?u=${email}`
 }
 
+/**
+ * Service image mapping helper
+ * Dynamically resolves a service category/name to local imported assets.
+ * Returns null if no matching image is found.
+ */
+export const getServiceImage = (categoryOrName) => {
+  if (!categoryOrName) return null
+  const name = categoryOrName.toLowerCase()
+  if (name.includes('plumbing')) return servicePlumbingImg
+  if (name.includes('electrician') || name.includes('electrical')) return serviceElectricianImg
+  if (name.includes('ac repair') || name.includes('ac maintenance') || name.includes('air conditioner') || name.includes('air conditioning')) return serviceAcRepairImg
+  if (name.includes('carpenter') || name.includes('furniture assembly')) return serviceCarpenterImg
+  if (name.includes('painting') || name.includes('painter') || name.includes('house painting')) return servicePainterImg
+  if (name.includes('cleaning') || name.includes('housemaid')) return serviceCleaningImg
+  if (name.includes('generator')) return serviceGeneratorImg
+  if (name.includes('appliance')) return serviceApplianceImg
+  if (name.includes('it support') || name.includes('computer')) return serviceItSupportImg
+  if (name.includes('cctv')) return serviceCctvImg
+  if (name.includes('smart home')) return serviceSmartHomeImg
+  if (name.includes('handyman')) return serviceHandymanImg
+  return null
+}
+
+

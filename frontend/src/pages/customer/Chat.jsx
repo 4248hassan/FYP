@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
+import { formatDateTime } from '../../utils'
 import api from '../../services/api'
 import Card from '../../components/ui/Card.jsx'
 import Loader from '../../components/ui/Loader.jsx'
@@ -94,7 +95,7 @@ export default function Chat() {
                     >
                       <p>{message.message}</p>
                       <p className="mt-1 text-xs opacity-80">
-                        {new Date(message.createdAt).toLocaleTimeString()}
+                        {formatDateTime(message.createdAt)}
                       </p>
                     </div>
                   </div>

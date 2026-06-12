@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatDateDDMMYYYY } from '../../utils'
 import api from '../../services/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -102,7 +103,7 @@ export default function AdminUsers() {
                           <div>
                             <p className="text-sm font-semibold text-slate-900">{customer.name}</p>
                             <p className="text-xs text-slate-500">{customer.email}</p>
-                            <p className="text-xs text-slate-500">Joined {new Date(customer.createdAt).toLocaleDateString()}</p>
+                            <p className="text-xs text-slate-500">Joined {formatDateDDMMYYYY(customer.createdAt)}</p>
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2 sm:mt-0">
                             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">Customer</span>
@@ -135,7 +136,7 @@ export default function AdminUsers() {
                           <div>
                             <p className="text-sm font-semibold text-slate-900">{vendor.name}</p>
                             <p className="text-xs text-slate-500">{vendor.email}</p>
-                            <p className="text-xs text-slate-500">Joined {new Date(vendor.createdAt).toLocaleDateString()}</p>
+                            <p className="text-xs text-slate-500">Joined {formatDateDDMMYYYY(vendor.createdAt)}</p>
                           </div>
                           <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-0">
                             <span className={`rounded-full px-3 py-1 text-xs font-medium ${vendor.isVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatDateDDMMYYYY } from '../../utils'
 import api from '../../services/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -168,7 +169,7 @@ export default function AdminComplaints() {
                             {complaint.description?.slice(0, 120) || 'No description available.'}
                           </p>
                           <p className="mt-3 text-xs text-slate-400">
-                            Created {new Date(complaint.createdAt).toLocaleDateString()}
+                            Created {formatDateDDMMYYYY(complaint.createdAt)}
                           </p>
                         </button>
                       ))}

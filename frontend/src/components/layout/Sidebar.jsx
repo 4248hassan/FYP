@@ -118,14 +118,17 @@ export default function Sidebar() {
   }
 
   const vendorLinks = [
-    { to: '/vendor', label: 'Dashboard' },
+    { to: '/vendor/dashboard', label: 'Dashboard' },
     { to: '/vendor/jobs', label: 'All Jobs' },
+    { to: '/vendor/wallet', label: '👛 My Wallet' },
     { to: '/vendor/profile', label: 'Profile' },
   ]
 
   const adminLinks = [
     { to: '/admin', label: 'Dashboard' },
     { to: '/admin/bookings', label: 'Bookings' },
+    { to: '/admin/escrow', label: '💳 Escrow' },
+    { to: '/admin/wallet', label: '👛 Admin Wallet' },
     { to: '/admin/users', label: 'Users' },
     { to: '/admin/vendors', label: 'Vendors' },
     { to: '/admin/complaints', label: 'Complaints' },

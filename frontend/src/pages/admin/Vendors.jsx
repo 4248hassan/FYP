@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import Avatar from '../../components/ui/Avatar'
 import api from '../../services/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -141,25 +142,12 @@ export default function AdminVendors() {
                     <div className="p-4 flex flex-col flex-1">
                       {/* Vendor Info with Circular Avatar */}
                       <div className="mb-4 flex items-start gap-4">
-                        {vendor.profileImage ? (
-                          <img
-                            src={vendor.profileImage}
-                            alt={vendor.name}
-                            className="h-16 w-16 flex-shrink-0 rounded-full object-cover border-2 border-slate-200"
-                            onError={(e) => {
-                              e.target.style.display = 'none'
-                            }}
-                          />
-                        ) : (
-                          <div className="h-16 w-16 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-lg border-2 border-slate-200">
-                            {vendor.name
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')
-                              .toUpperCase()
-                              .slice(0, 2)}
-                          </div>
-                        )}
+                        <Avatar
+                          src={vendor.profileImage}
+                          name={vendor.name}
+                          sizeClassName="h-16 w-16 text-xl"
+                          className="border-2 border-slate-200"
+                        />
                         <div className="flex-1 min-w-0 pt-1">
                           <h3 className="font-semibold text-slate-900 text-base">{vendor.name}</h3>
                           <p className="text-xs text-slate-600 truncate">{vendor.email}</p>

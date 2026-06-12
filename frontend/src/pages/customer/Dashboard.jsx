@@ -7,7 +7,6 @@ import Navbar from '../../components/layout/Navbar'
 import { useAuth } from '../../hooks/useAuth'
 import Sidebar from '../../components/layout/Sidebar'
 import UpcomingBookings from '../../components/dashboard/UpcomingBookings'
-import { convertUSDToPKR } from '../../utils'
 import api from '../../services/api'
 
 export default function CustomerDashboard() {
@@ -36,12 +35,15 @@ export default function CustomerDashboard() {
 
   // Calculate stats from orders
   const stats = useMemo(() => {
-    const activeBookings = orders.filter(order => ['vendor_assigned', 'payment_secured', 'in_progress'].includes(order.status)).length
-    const completedServices = orders.filter(order => order.status === 'completed').length
-    const pendingPayments = orders.filter(order => order.status === 'payment_secured').length
+    const activeBookings = orders.filter(order => ['accepted', 'vendor_assigned', 'payment_secured', 'in_progress'].includes(order.status)).length
+    const completedServices = orders.filter(order => order.status === 'completed' || order.status === 'paid').length
+    const pendingPayments = orders.filter(order => order.status === 'completed').length
     const totalSpent = orders
-      .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.escrowAmount || 0), 0)
+      .filter(order => order.status === 'paid')
+      .reduce((sum, order) => {
+        const amount = order.escrowAmount || order.optionalBudget || order.serviceStartingPrice || (order.serviceId?.basePrice || 0)
+        return sum + (amount || 0)
+      }, 0)
 
     return { activeBookings, completedServices, pendingPayments, totalSpent }
   }, [orders])
@@ -105,7 +107,7 @@ export default function CustomerDashboard() {
             </Card>
             <Card className="p-4">
               <h3 className="text-lg font-semibold text-gray-900">Total Spent</h3>
-              <p className="text-3xl font-bold text-purple-600">PKR {convertUSDToPKR(stats.totalSpent)}</p>
+              <p className="text-3xl font-bold text-purple-600">PKR {stats.totalSpent.toLocaleString()}</p>
             </Card>
           </div>
 

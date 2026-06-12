@@ -8,9 +8,11 @@ const {
   listBookings,
   listEscrows,
   releaseEscrow,
+  refundEscrow,
   listComplaints,
   getComplaintById,
   updateComplaintStatus,
+  getAdminWallet,
 } = require('../controllers/adminController');
 const { dashboard } = require('../controllers/analyticsController');
 const { protect, requireRole } = require('../middleware/auth');
@@ -26,6 +28,8 @@ router.get('/complaints/:id', protect, requireRole(['admin']), getComplaintById)
 router.put('/complaints/:id/status', protect, requireRole(['admin']), updateComplaintStatus);
 router.get('/escrows', protect, requireRole(['admin']), listEscrows);
 router.post('/escrows/:id/release', protect, requireRole(['admin']), releaseEscrow);
+router.post('/escrows/:id/refund', protect, requireRole(['admin']), refundEscrow);
+router.get('/wallet', protect, requireRole(['admin']), getAdminWallet);
 router.get('/dashboard', protect, requireRole(['admin']), dashboard);
 
 module.exports = router;

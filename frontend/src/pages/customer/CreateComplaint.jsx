@@ -173,11 +173,10 @@ export default function CreateComplaint() {
                     ) : (
                       <div className="mt-3">
                         <p className="mb-2 text-xs text-slate-500">Preview placeholder:</p>
-                        <img
-                          src="https://picsum.photos/seed/handyman/400/300"
-                          alt="Placeholder"
-                          className="h-48 w-full rounded-lg border border-slate-200 object-cover opacity-50"
-                        />
+                        <div className="h-48 w-full rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center bg-slate-50 text-slate-500">
+                          <span className="text-3xl mb-1">📸</span>
+                          <span className="text-xs">No image selected</span>
+                        </div>
                       </div>
                     )}
                   </div>

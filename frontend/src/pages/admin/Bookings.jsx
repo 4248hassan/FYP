@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatDateDDMMYYYY } from '../../utils'
 import api from '../../services/api'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -84,15 +85,18 @@ export default function AdminBookings() {
                         <p className="text-xs text-slate-500">{booking.vendorId?.email}</p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-wide text-slate-500">Service</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">{booking.serviceId?.name || 'Service not available'}</p>
-                        <p className="text-xs text-slate-500">Amount: PKR {booking.serviceId?.basePrice || booking.escrowAmount || 0}</p>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">Service Name</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">{booking.selectedService || booking.serviceId?.name || 'Service not available'}</p>
+                        <p className="text-xs text-slate-500">
+                          Starting Price: {booking.serviceStartingPrice !== undefined ? `PKR ${booking.serviceStartingPrice.toLocaleString()}` : (booking.serviceId?.basePrice ? `PKR ${booking.serviceId.basePrice.toLocaleString()}` : 'N/A')}
+                        </p>
+                        <p className="text-xs text-slate-500">Amount: PKR {booking.escrowAmount || 0}</p>
                       </div>
                     </div>
                     <div className="grid gap-4 border-t border-slate-200 px-4 py-4 sm:grid-cols-3">
                       <div>
                         <p className="text-xs uppercase tracking-wide text-slate-500">Booking Date</p>
-                        <p className="mt-1 text-sm text-slate-900">{booking.bookingDate ? new Date(booking.bookingDate).toLocaleDateString() : 'Unknown date'}</p>
+                        <p className="mt-1 text-sm text-slate-900">{booking.bookingDate ? formatDateDDMMYYYY(booking.bookingDate) : 'Unknown date'}</p>
                         <p className="text-xs text-slate-500">{booking.timeSlot || 'No timeslot'}</p>
                       </div>
                       <div>
@@ -103,7 +107,7 @@ export default function AdminBookings() {
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-wide text-slate-500">Created</p>
-                        <p className="mt-1 text-sm text-slate-900">{new Date(booking.createdAt).toLocaleDateString()}</p>
+                        <p className="mt-1 text-sm text-slate-900">{formatDateDDMMYYYY(booking.createdAt)}</p>
                       </div>
                     </div>
                   </Card>

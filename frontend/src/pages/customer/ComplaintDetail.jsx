@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { formatDateTime } from '../../utils'
 import api from '../../services/api'
 import Card from '../../components/ui/Card'
 import Loader from '../../components/ui/Loader'
@@ -7,6 +8,7 @@ import Button from '../../components/ui/Button'
 import Navbar from '../../components/layout/Navbar'
 import Sidebar from '../../components/layout/Sidebar'
 import { complaintProblem, getAvatarUrl } from '../../assets/images'
+import Avatar from '../../components/ui/Avatar'
 
 export default function ComplaintDetail() {
   const { id } = useParams()
@@ -156,7 +158,7 @@ export default function ComplaintDetail() {
                   <p className="mt-4 text-xs text-slate-500">
                     Created:{' '}
                     {complaint.createdAt
-                      ? new Date(complaint.createdAt).toLocaleString()
+                      ? formatDateTime(complaint.createdAt)
                       : 'Unknown'}
                   </p>
                 </Card>
@@ -165,11 +167,10 @@ export default function ComplaintDetail() {
                   {assignedVendor.name !== 'Not yet assigned' ? (
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={getAvatarUrl(assignedVendor.email, 150)}
-                          alt={assignedVendor.name}
-                          className="h-12 w-12 rounded-full object-cover"
-                          loading="lazy"
+                        <Avatar
+                          src={assignedVendor.profileImage}
+                          name={assignedVendor.name}
+                          sizeClassName="h-12 w-12 text-sm"
                         />
                         <div>
                           <p className="font-medium text-slate-900">{assignedVendor.name}</p>

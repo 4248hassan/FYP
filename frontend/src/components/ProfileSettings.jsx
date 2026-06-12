@@ -1,7 +1,8 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Card from './ui/Card'
 import Button from './ui/Button'
+import Avatar from './ui/Avatar'
 
 export default function ProfileSettings({ title }) {
   const { user, updateProfile, changePassword, uploadProfilePicture } = useAuth()
@@ -173,27 +174,13 @@ export default function ProfileSettings({ title }) {
     }
   }
 
-  const profileImageMarkup = previewUrl ? (
-    <img
+  const profileImageMarkup = (
+    <Avatar
       src={previewUrl}
-      alt="Profile preview"
-      className="h-28 w-28 rounded-full object-cover border-2 border-slate-200"
+      name={user.name}
+      sizeClassName="h-28 w-28 text-3xl"
+      className="border-2 border-slate-200"
     />
-  ) : (
-    <div className="flex h-28 w-28 items-center justify-center rounded-full bg-slate-100 text-slate-500 border-2 border-slate-200">
-      <svg
-        viewBox="0 0 24 24"
-        className="h-12 w-12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
-    </div>
   )
 
   return (

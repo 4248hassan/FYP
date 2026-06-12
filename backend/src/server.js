@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 const morgan = require('morgan');
 const cors = require('cors');
 
-dotenv.config(); // ✅ FIXED
+dotenv.config(); // ✅ VIP Workflow System — Phase 1 Complete
 
 const connectDB = require('./config/db');
 const routes = require('./routes');
